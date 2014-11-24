@@ -5,7 +5,7 @@ y = Symbol('y')
 
 exactResult = integrate(x * sin(y), (x, 0, 10), (y, 0, 10))
 
-class Bspline(object):
+class BSpline(object):
     def __init__(self, knots, cpoints):
         self.knots = knots
         self.cpoints = cpoints
@@ -34,5 +34,25 @@ class Bspline(object):
         return sum([self.cpoints[i - 1]
             * self.basisfunc(i, self.p, eta)
             for i in range(len(self.cpoints))])
+
+class NURBS(BSpline):
+    def __init__(self, knots, cpoints, weights):
+        super(NURBS, self).__init__(knots, cpoints)
+        self.weights = weights
+
+    def weightfunc(self, eta):
+        return sum([self.weights[i - 1]
+            * super(NURBS, self).basisfunc(i, self.p, eta)
+            for i in range(len(self.weights))])
+
+    def basisfunct(self, i, p, eta):
+        return self.weights[i - 1] \
+            * super(NURBS, self).basisfunc(i, self.p, eta) \
+            / self.weightfunc(eta)
+
+# integrate a function defined as a linear combination of a
+# NURBS basis
+def integrate(cvars, NURBS):
+    pass
 
 print "exact: {} = {}".format(exactResult, N(exactResult))
