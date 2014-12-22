@@ -39,7 +39,7 @@ def cox_de_boor(knots, i, p, eta):
 
 
 
-# --- surface objects ---
+# --- surface classes ---
 
 class BezierSurface(object):
     # polorders is a list of 2 polynomial orders
