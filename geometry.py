@@ -44,13 +44,16 @@ class BSplineSurface(object):
         return cox_de_boor(self.kvectors[1], j,
             self.polorders[1], eta)
 
+    # 2D basis function
+    def basis(self, i, j, eta):
+        return self.basis_x(i, eta) * self.basis_y(j, eta)
+
     def eval(self, eta):
         result = 0
 
         for j in range(1, len(self.cpoints) + 1):
             for i in range(1, len(self.cpoints[0]) + 1):
-                result += self.cpoints[j - 1][i - 1] * \
-                    self.basis_x(i, eta) * self.basis_y(j, eta)
+                result += self.cpoints[j - 1][i - 1] * self.basis(i, j, eta)
 
         return result
 
