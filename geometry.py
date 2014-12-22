@@ -2,20 +2,20 @@ import numpy as np
 
 # --- helper functions ---
 
-# Bernstein polynomial formula, result evaluated at eta
+# Bernstein polynomial formula, result evaluated at xi
 # i = 1, 2, ..., n
-def bernstein(i, p, eta):
+def bernstein(i, p, xi):
     if i == 1 and p == 0: return 1
     if i < 1 or i > p + 1: return 0
 
-    return (1 - eta) * bernstein(i, p - 1, eta) + \
-        eta * bernstein(i - 1, p - 1, eta)
+    return (1 - xi) * bernstein(i, p - 1, xi) + \
+        xi * bernstein(i - 1, p - 1, xi)
 
-# Cox-De Boor recursion formula, result evaluated at eta
+# Cox-De Boor recursion formula, result evaluated at xi
 # i = 1, 2, ..., n
-def cox_de_boor(knots, i, p, eta):
+def cox_de_boor(knots, i, p, xi):
     if p == 0:
-        if eta >= knots[i - 1] and eta < knots[i]:
+        if xi >= knots[i - 1] and xi < knots[i]:
             return 1
         return 0
      
@@ -24,18 +24,18 @@ def cox_de_boor(knots, i, p, eta):
     if Ad == 0:
         A = 0
     else:
-        An = eta - knots[i - 1]
+        An = xi - knots[i - 1]
         A = An / Ad
 
     Bd = knots[i + p] - knots[i]
     if Bd == 0:
         B = 0
     else:
-        Bn = knots[i + p] - eta
+        Bn = knots[i + p] - xi
         B = Bn / Bd
 
-    return A * cox_de_boor(knots, i, p - 1, eta) \
-        + B * cox_de_boor(knots, i + 1, p - 1, eta)
+    return A * cox_de_boor(knots, i, p - 1, xi) \
+        + B * cox_de_boor(knots, i + 1, p - 1, xi)
 
 
 
@@ -48,23 +48,24 @@ class BezierSurface(object):
         self.polorders = polorders
         self.cpoints = cpoints
 
-    # basis functions in x direction
-    def basis_x(self, i, eta):
-        return bernstein(i, self.polorders[0], eta)
-    # basis function in y direction
-    def basis_y(self, j, eta):
+    # basis functions in xi direction
+    def basis_xi(self, i, xi):
+        return bernstein(i, self.polorders[0], xi)
+    # basis function in eta direction
+    def basis_eta(self, j, eta):
         return bernstein(j, self.polorders[1], eta)
 
     # 2D basis function
-    def basis(self, i, j, eta):
-        return self.basis_x(i, eta) * self.basis_y(j, eta)
+    def basis(self, i, j, xi):
+        return self.basis_xi(i, xi[0]) * self.basis_eta(j, xi[1])
 
-    def eval(self, eta):
+    # evaluate surface at xi = (xi, eta)
+    def eval(self, xi):
         result = 0
 
         for j in range(1, len(self.cpoints) + 1):
             for i in range(1, len(self.cpoints[0]) + 1):
-                result += self.cpoints[j - 1][i - 1] * self.basis(i, j, eta)
+                result += self.cpoints[j - 1][i - 1] * self.basis(i, j, xi)
 
         return result
 
@@ -77,12 +78,12 @@ class BSplineSurface(BezierSurface):
         super(BSplineSurface, self).__init__(polorders, cpoints)
         self.kvectors = kvectors
 
-    # basis functions in x direction
-    def basis_x(self, i, eta):
+    # basis functions in xi direction
+    def basis_xi(self, i, xi):
         return cox_de_boor(self.kvectors[0], i,
-            self.polorders[0], eta)
-    # basis function in y direction
-    def basis_y(self, j, eta):
+            self.polorders[0], xi)
+    # basis function in eta direction
+    def basis_eta(self, j, eta):
         return cox_de_boor(self.kvectors[1], j,
             self.polorders[1], eta)
 
@@ -94,21 +95,21 @@ class NURBSSurface(BSplineSurface):
         super(NURBSSurface, self).__init__(kvectors, cpoints)
         self.weights = weights
 
-    # weight function evaluated at eta
-    def W(self, eta):
+    # weight function
+    def W(self, xi):
         result = 0
 
         for j in range(1, len(self.weights) + 1):
             for i in range(1, len(self.weights[0]) + 1):
-                result += super(NURBSSurface, self).basis(i, j, eta) * \
+                result += super(NURBSSurface, self).basis(i, j, xi) * \
                     self.weights[j - 1][i - 1]
 
         return result
 
     # 2D basis function
-    def basis(self, i, j, eta):
-        return super(NURBSSurface, self).basis(i, j, eta) * \
-            self.weights[j - 1][i - 1] / self.W(eta)
+    def basis(self, i, j, xi):
+        return super(NURBSSurface, self).basis(i, j, xi) * \
+            self.weights[j - 1][i - 1] / self.W(xi)
 
 
 
@@ -130,13 +131,13 @@ if __name__ == "__main__":
     q = 1
 
     surf = BezierSurface((p,q), cpoints)
-    print "Bezier at 0.7: {}".format(surf.eval(0.7))
+    print "Bezier at (0.7, 0.8): {}".format(surf.eval((0.7, 0.8)))
 
     xknots = [0., 0., 0., 1., 2., 3., 3., 3.]
     yknots = [0., 0., 1., 2., 3., 3.]
 
     surf2 = BSplineSurface((xknots, yknots), cpoints)
-    print "BSpline at 1.9: {}".format(surf2.eval(1.9))
+    print "BSpline at (1.8, 1.9): {}".format(surf2.eval((1.8, 1.9)))
 
     weights = []
     for j in range(m):
@@ -145,4 +146,4 @@ if __name__ == "__main__":
             weights[j].append((i*j)**0.5)
 
     surf3 = NURBSSurface((xknots, yknots), cpoints, weights)
-    print "NURBS at 1.9: {}".format(surf3.eval(1.9))
+    print "NURBS at (1.8, 1.9): {}".format(surf3.eval((1.8, 1.9)))
