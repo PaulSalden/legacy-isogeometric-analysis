@@ -1,5 +1,16 @@
 import numpy as np
 
+# --- helper functions ---
+
+# Bernstein polynomial formula, result evaluated at eta
+# i = 1, 2, ..., n
+def bernstein(i, p, eta):
+    if i == 1 and p == 0: return 1
+    if i < 1 or i > p + 1: return 0
+
+    return (1 - eta) * bernstein(i, p - 1, eta) + \
+        eta * bernstein(i - 1, p - 1, eta)
+
 # Cox-De Boor recursion formula, result evaluated at eta
 # i = 1, 2, ..., n
 def cox_de_boor(knots, i, p, eta):
@@ -26,23 +37,23 @@ def cox_de_boor(knots, i, p, eta):
     return A * cox_de_boor(knots, i, p - 1, eta) \
         + B * cox_de_boor(knots, i + 1, p - 1, eta)
 
-class BSplineSurface(object):
-    # kvectors is a list of 2 knot vectors
-    # cpoints is a 2D list of control points np.array(x, y)
-    def __init__(self, kvectors, cpoints):
-        self.kvectors = kvectors
+
+
+# --- surface objects ---
+
+class BezierSurface(object):
+    # polorders is a list of 2 polynomial orders
+    # cpoints is a 2d list of control points np.array(x, y)
+    def __init__(self, polorders, cpoints):
+        self.polorders = polorders
         self.cpoints = cpoints
-        # assume an open knot vector
-        self.polorders = [v.count(v[0]) - 1 for v in kvectors]
 
     # basis functions in x direction
     def basis_x(self, i, eta):
-        return cox_de_boor(self.kvectors[0], i,
-            self.polorders[0], eta)
+        return bernstein(i, self.polorders[0], eta)
     # basis function in y direction
     def basis_y(self, j, eta):
-        return cox_de_boor(self.kvectors[1], j,
-            self.polorders[1], eta)
+        return bernstein(j, self.polorders[1], eta)
 
     # 2D basis function
     def basis(self, i, j, eta):
@@ -56,6 +67,24 @@ class BSplineSurface(object):
                 result += self.cpoints[j - 1][i - 1] * self.basis(i, j, eta)
 
         return result
+
+class BSplineSurface(BezierSurface):
+    # kvectors is a list of 2 knot vectors
+    # cpoints is a 2D list of control points np.array(x, y)
+    def __init__(self, kvectors, cpoints):
+        # assume an open knot vector
+        polorders = [v.count(v[0]) - 1 for v in kvectors]
+        super(BSplineSurface, self).__init__(polorders, cpoints)
+        self.kvectors = kvectors
+
+    # basis functions in x direction
+    def basis_x(self, i, eta):
+        return cox_de_boor(self.kvectors[0], i,
+            self.polorders[0], eta)
+    # basis function in y direction
+    def basis_y(self, j, eta):
+        return cox_de_boor(self.kvectors[1], j,
+            self.polorders[1], eta)
 
 class NURBSSurface(BSplineSurface):
     # kvectors is a list of 2 knot vectors
@@ -81,12 +110,13 @@ class NURBSSurface(BSplineSurface):
         return super(NURBSSurface, self).basis(i, j, eta) * \
             self.weights[j - 1][i - 1] / self.W(eta)
 
-# allow a test run
+
+
+# --- test run ---
+
 if __name__ == "__main__":
-    # with n x m basis functions
-    xknots = [0., 0., 0., 1., 2., 3., 3., 3.]
+    # n x m basis functions
     n = 5
-    yknots = [0., 0., 1., 2., 3., 3.]
     m = 4
 
     cpoints = []
@@ -95,8 +125,18 @@ if __name__ == "__main__":
         for i in range(n):
             cpoints[j].append(np.array((i, j)))
 
-    surf = BSplineSurface((xknots, yknots), cpoints)
-    print "BSpline at 1.9: {}".format(surf.eval(1.9))
+    # polynomial orders p and q
+    p = 2
+    q = 1
+
+    surf = BezierSurface((p,q), cpoints)
+    print "Bezier at 0.7: {}".format(surf.eval(0.7))
+
+    xknots = [0., 0., 0., 1., 2., 3., 3., 3.]
+    yknots = [0., 0., 1., 2., 3., 3.]
+
+    surf2 = BSplineSurface((xknots, yknots), cpoints)
+    print "BSpline at 1.9: {}".format(surf2.eval(1.9))
 
     weights = []
     for j in range(m):
@@ -104,5 +144,5 @@ if __name__ == "__main__":
         for i in range(n):
             weights[j].append((i*j)**0.5)
 
-    surf2 = NURBSSurface((xknots, yknots), cpoints, weights)
-    print "NURBS at 1.9: {}".format(surf2.eval(1.9))
+    surf3 = NURBSSurface((xknots, yknots), cpoints, weights)
+    print "NURBS at 1.9: {}".format(surf3.eval(1.9))
