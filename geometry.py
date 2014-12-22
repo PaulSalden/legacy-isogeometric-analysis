@@ -57,17 +57,52 @@ class BSplineSurface(object):
 
         return result
 
+class NURBSSurface(BSplineSurface):
+    # kvectors is a list of 2 knot vectors
+    # cpoints is a 2D list of control points np.array(x, y)
+    # weights is a 2D list of weights
+    def __init__(self, kvectors, cpoints, weights):
+        super(NURBSSurface, self).__init__(kvectors, cpoints)
+        self.weights = weights
+
+    # weight function evaluated at eta
+    def W(self, eta):
+        result = 0
+
+        for j in range(1, len(self.weights) + 1):
+            for i in range(1, len(self.weights[0]) + 1):
+                result += super(NURBSSurface, self).basis(i, j, eta) * \
+                    self.weights[j - 1][i - 1]
+
+        return result
+
+    # 2D basis function
+    def basis(self, i, j, eta):
+        return super(NURBSSurface, self).basis(i, j, eta) * \
+            self.weights[j - 1][i - 1] / self.W(eta)
+
 # allow a test run
 if __name__ == "__main__":
     # with n x m basis functions
-    xknots = [0., 0., 0., 1., 2., 3., 3., 3.] # n = 5
-    yknots = [0., 0., 1., 2., 3., 3.] # m = 4
+    xknots = [0., 0., 0., 1., 2., 3., 3., 3.]
+    n = 5
+    yknots = [0., 0., 1., 2., 3., 3.]
+    m = 4
 
     cpoints = []
-    for j in range(4):
+    for j in range(m):
         cpoints.append([])
-        for i in range(5):
+        for i in range(n):
             cpoints[j].append(np.array((i, j)))
 
     surf = BSplineSurface((xknots, yknots), cpoints)
-    print surf.eval(1.9)
+    print "BSpline at 1.9: {}".format(surf.eval(1.9))
+
+    weights = []
+    for j in range(m):
+        weights.append([])
+        for i in range(n):
+            weights[j].append((i*j)**0.5)
+
+    surf2 = NURBSSurface((xknots, yknots), cpoints, weights)
+    print "NURBS at 1.9: {}".format(surf2.eval(1.9))
